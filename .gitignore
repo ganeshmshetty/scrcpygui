@@ -7,12 +7,12 @@ yarn-error.log*
 pnpm-debug.log*
 lerna-debug.log*
 
-guide
+# Dependency directories
 node_modules
 dist
 dist-ssr
 *.local
-
+./plan.md
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

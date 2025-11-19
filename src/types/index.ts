@@ -23,3 +23,23 @@ export interface MirrorOptions {
   stayAwake?: boolean;
   turnScreenOff?: boolean;
 }
+
+// Settings for the application
+export interface Settings {
+  resolution: string;
+  bitrate: number;
+  maxFps: number;
+  alwaysOnTop: boolean;
+  stayAwake: boolean;
+  turnScreenOff: boolean;
+}
+
+// Default settings
+export const DEFAULT_SETTINGS: Settings = {
+  resolution: 'default',
+  bitrate: 8000000,
+  maxFps: 60,
+  alwaysOnTop: false,
+  stayAwake: true,
+  turnScreenOff: false,
+};

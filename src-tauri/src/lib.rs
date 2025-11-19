@@ -68,6 +68,9 @@ pub fn run() {
             commands::get_process_stats,
             commands::check_scrcpy_available,
             commands::get_scrcpy_version,
+            // Settings commands
+            commands::save_settings,
+            commands::load_settings,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::Destroyed = event {

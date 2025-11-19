@@ -1,6 +1,6 @@
 import { useState } from "react";
-import type { Device, ScrcpyOptions } from "../types";
-import { scrcpyService } from "../services";
+import type { Device, ScrcpyOptions, Settings } from "../types";
+import { scrcpyService, settingsService } from "../services";
 
 interface MirrorButtonProps {
   device: Device;
@@ -25,14 +25,17 @@ export function MirrorButton({
       setLoading(true);
       setError(null);
 
-      // Default options
+      // Load user settings
+      const settings: Settings = await settingsService.loadSettings();
+
+      // Convert settings to scrcpy options
       const options: Partial<ScrcpyOptions> = {
-        max_size: 1920,
-        bit_rate: 8000000,
-        max_fps: 60,
-        always_on_top: false,
-        stay_awake: true,
-        turn_screen_off: false,
+        max_size: settings.resolution === 'default' ? undefined : parseInt(settings.resolution),
+        bit_rate: settings.bitrate,
+        max_fps: settings.maxFps,
+        always_on_top: settings.alwaysOnTop,
+        stay_awake: settings.stayAwake,
+        turn_screen_off: settings.turnScreenOff,
       };
 
       const newSessionId = await scrcpyService.startMirroring(device.id, options);
