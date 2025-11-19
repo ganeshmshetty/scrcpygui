@@ -56,6 +56,9 @@ pub fn run() {
             commands::disconnect_device,
             commands::enable_wireless_mode,
             commands::refresh_devices,
+            commands::save_device,
+            commands::get_saved_devices,
+            commands::remove_saved_device,
             // Scrcpy commands
             commands::start_mirroring,
             commands::stop_mirroring,

@@ -1,6 +1,8 @@
 use serde::{Deserialize, Serialize};
 use crate::adb::Adb;
 use crate::utils;
+use std::fs;
+use std::path::PathBuf;
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct Device {
@@ -163,3 +165,104 @@ pub async fn refresh_devices(app: tauri::AppHandle) -> Result<Vec<Device>, Strin
     get_connected_devices(app).await
 }
 
+/// Get the path to the saved devices file
+fn get_saved_devices_path() -> Result<PathBuf, String> {
+    let config_dir = dirs::config_dir()
+        .ok_or_else(|| "Failed to get config directory".to_string())?;
+    
+    let app_dir = config_dir.join("scrcpygui");
+    
+    // Create directory if it doesn't exist
+    if !app_dir.exists() {
+        fs::create_dir_all(&app_dir)
+            .map_err(|e| format!("Failed to create config directory: {}", e))?;
+    }
+    
+    Ok(app_dir.join("saved_devices.json"))
+}
+
+/// Save a device to the saved devices list
+#[tauri::command]
+pub async fn save_device(device: Device) -> Result<bool, String> {
+    let devices_path = get_saved_devices_path()?;
+    
+    // Read existing devices
+    let mut saved_devices: Vec<Device> = if devices_path.exists() {
+        let content = fs::read_to_string(&devices_path)
+            .map_err(|e| format!("Failed to read saved devices: {}", e))?;
+        serde_json::from_str(&content)
+            .map_err(|e| format!("Failed to parse saved devices: {}", e))?
+    } else {
+        Vec::new()
+    };
+    
+    // Check if device already exists (by ID)
+    if let Some(pos) = saved_devices.iter().position(|d| d.id == device.id) {
+        // Update existing device
+        saved_devices[pos] = device;
+    } else {
+        // Add new device
+        saved_devices.push(device);
+    }
+    
+    // Write back to file
+    let json = serde_json::to_string_pretty(&saved_devices)
+        .map_err(|e| format!("Failed to serialize devices: {}", e))?;
+    
+    fs::write(&devices_path, json)
+        .map_err(|e| format!("Failed to write saved devices: {}", e))?;
+    
+    Ok(true)
+}
+
+/// Get all saved devices
+#[tauri::command]
+pub async fn get_saved_devices() -> Result<Vec<Device>, String> {
+    let devices_path = get_saved_devices_path()?;
+    
+    if !devices_path.exists() {
+        return Ok(Vec::new());
+    }
+    
+    let content = fs::read_to_string(&devices_path)
+        .map_err(|e| format!("Failed to read saved devices: {}", e))?;
+    
+    let devices: Vec<Device> = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse saved devices: {}", e))?;
+    
+    Ok(devices)
+}
+
+/// Remove a device from saved devices
+#[tauri::command]
+pub async fn remove_saved_device(device_id: String) -> Result<bool, String> {
+    let devices_path = get_saved_devices_path()?;
+    
+    if !devices_path.exists() {
+        return Ok(false);
+    }
+    
+    // Read existing devices
+    let content = fs::read_to_string(&devices_path)
+        .map_err(|e| format!("Failed to read saved devices: {}", e))?;
+    
+    let mut saved_devices: Vec<Device> = serde_json::from_str(&content)
+        .map_err(|e| format!("Failed to parse saved devices: {}", e))?;
+    
+    // Remove device by ID
+    let initial_len = saved_devices.len();
+    saved_devices.retain(|d| d.id != device_id);
+    
+    if saved_devices.len() == initial_len {
+        return Ok(false); // Device not found
+    }
+    
+    // Write back to file
+    let json = serde_json::to_string_pretty(&saved_devices)
+        .map_err(|e| format!("Failed to serialize devices: {}", e))?;
+    
+    fs::write(&devices_path, json)
+        .map_err(|e| format!("Failed to write saved devices: {}", e))?;
+    
+    Ok(true)
+}

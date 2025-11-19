@@ -39,4 +39,25 @@ export const deviceService = {
   async refreshDevices(): Promise<Device[]> {
     return await invoke<Device[]>("refresh_devices");
   },
+
+  /**
+   * Save a device to the saved devices list
+   */
+  async saveDevice(device: Device): Promise<boolean> {
+    return await invoke<boolean>("save_device", { device });
+  },
+
+  /**
+   * Get all saved devices
+   */
+  async getSavedDevices(): Promise<Device[]> {
+    return await invoke<Device[]>("get_saved_devices");
+  },
+
+  /**
+   * Remove a device from saved devices
+   */
+  async removeSavedDevice(deviceId: string): Promise<boolean> {
+    return await invoke<boolean>("remove_saved_device", { deviceId });
+  },
 };
