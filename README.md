@@ -1,97 +1,45 @@
-# Scrcpy GUI - Android Screen Mirroring
+# Scrcpy GUI
 
-A modern, user-friendly Windows desktop application built with Tauri, React, and TypeScript that provides a beautiful GUI wrapper for Scrcpy, making Android screen mirroring effortless.
+A modern, intuitive graphical interface for [scrcpy](https://github.com/Genymobile/scrcpy) - the powerful Android screen mirroring tool.
 
-## ✨ Features
+## Features
 
-### 🎨 Modern UI/UX (Phase 6 ✅)
-- **Professional Design**: Clean white and blue color scheme
-- **Toast Notifications**: Real-time feedback for all operations
-- **Loading States**: Visual indicators during async operations
-- **Tooltips**: Contextual help throughout the interface
-- **Smooth Animations**: Polished transitions and effects
-- **Responsive Layout**: Adapts to different window sizes
+- **Device Management** - Automatic USB device detection and wireless connection support
+- **Mirror Control** - One-click screen mirroring with customizable settings
+- **Session Management** - Track and control active mirroring sessions
+- **Wireless Setup** - Simplified wireless connection wizard
+- **Settings** - Persistent configuration for resolution, bitrate, FPS, and display options
 
-### 📱 Device Management
-- **Auto-Discovery**: Automatically detect USB and wireless devices
-- **Wireless Setup Wizard**: Step-by-step guide for wireless connection
-- **Saved Devices**: Quick reconnect to frequently used devices
-- **Device Status**: Real-time connection and mirroring status
+## Requirements
 
-### 🎬 Screen Mirroring
-- **One-Click Mirroring**: Start mirroring with a single click
-- **Process Management**: Track and manage active sessions
-- **Customizable Settings**: Resolution, bitrate, FPS, and more
-- **Advanced Options**: Always-on-top, stay awake, turn screen off
-
-### ⚙️ Settings & Configuration
-- **Resolution Control**: Default, 1080p, 720p, or custom
-- **Bitrate Adjustment**: 1-20 Mbps for quality vs performance
-- **FPS Limiter**: 15-120 FPS to optimize performance
-- **Display Options**: Persistent settings per device
-
-## 🎨 UI Theme
-
-The application features a professional **white and blue** color scheme:
-- **Primary Color**: Blue (#3b82f6)
-- **Background**: White with subtle gradients
-- **Accent Elements**: Various shades of blue
-- **Status Indicators**: Color-coded (green, red, yellow, blue)
-
-## 🚀 Getting Started
-
-### Prerequisites
 - Windows 10/11
-- Node.js 16+
-- Rust (latest stable)
+- Android device with USB debugging enabled
 
-### Installation
+## Installation
 
-1. Clone the repository:
-```bash
-git clone <repository-url>
-cd scrcpygui
-```
+1. Download the latest release
+2. Extract and run `scrcpygui.exe`
+3. Connect your Android device via USB
 
-2. Install dependencies:
-```bash
-npm install
-```
+## Usage
 
-3. Run in development mode:
-```bash
-npm run tauri dev
-```
+1. **Connect Device** - Plug in your Android device or use wireless setup
+2. **Configure Settings** - Adjust resolution, bitrate, and display options
+3. **Start Mirroring** - Click the mirror button to begin
 
-4. Build for production:
-```bash
-npm run tauri build
-```
+## Technology
 
-## 📋 Project Status
+Built with:
+- [Tauri](https://tauri.app/) - Rust-based desktop framework
+- [React](https://react.dev/) - UI components
+- [TypeScript](https://www.typescriptlang.org/) - Type-safe development
+- [Tailwind CSS](https://tailwindcss.com/) - Modern styling
 
-- ✅ **Phase 1**: Project Setup & Foundation
-- ✅ **Phase 2**: ADB Integration & Device Discovery
-- ✅ **Phase 3**: Scrcpy Integration
-- ✅ **Phase 4**: Wireless Connection Setup
-- ✅ **Phase 5**: Settings & Configuration
-- ✅ **Phase 6**: UI/UX Polish
-- ⏳ **Phase 7**: Testing & Bug Fixes
-- ⏳ **Phase 8**: Build & Distribution
+## License
 
-## 🛠️ Tech Stack
+MIT License - See LICENSE file for details
 
-- **Frontend**: React 18 + TypeScript + Tailwind CSS
-- **Backend**: Rust + Tauri
-- **External Tools**: Scrcpy, ADB (bundled)
-- **Platform**: Windows
+## Acknowledgments
 
-## 📖 Documentation
-
-See [plan.md](./plan.md) for detailed project planning and roadmap.
-See [PHASE6_SUMMARY.md](./PHASE6_SUMMARY.md) for UI/UX implementation details.
-
-## Recommended IDE Setup
-
-- [VS Code](https://code.visualstudio.com/) + [Tauri](https://marketplace.visualstudio.com/items?itemName=tauri-apps.tauri-vscode) + [rust-analyzer](https://marketplace.visualstudio.com/items?itemName=rust-lang.rust-analyzer)
+Powered by [scrcpy](https://github.com/Genymobile/scrcpy) by Genymobile
 
