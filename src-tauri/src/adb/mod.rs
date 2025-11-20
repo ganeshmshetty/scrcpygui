@@ -40,6 +40,7 @@ impl Adb {
     }
 
     /// Get the ADB version
+    #[allow(dead_code)]
     pub fn version(&self) -> Result<String, String> {
         self.execute(&["version"])
     }
@@ -51,6 +52,7 @@ impl Adb {
     }
 
     /// Kill the ADB server
+    #[allow(dead_code)]
     pub fn kill_server(&self) -> Result<(), String> {
         self.execute(&["kill-server"])?;
         Ok(())
@@ -124,6 +126,7 @@ impl Adb {
     }
 
     /// Disconnect from all devices
+    #[allow(dead_code)]
     pub fn disconnect_all(&self) -> Result<String, String> {
         self.execute(&["disconnect"])
     }
@@ -191,16 +194,19 @@ impl Adb {
     }
 
     /// Get device manufacturer
+    #[allow(dead_code)]
     pub fn get_manufacturer(&self, device_serial: Option<&str>) -> Result<String, String> {
         self.get_prop(device_serial, "ro.product.manufacturer")
     }
 
     /// Get Android version
+    #[allow(dead_code)]
     pub fn get_android_version(&self, device_serial: Option<&str>) -> Result<String, String> {
         self.get_prop(device_serial, "ro.build.version.release")
     }
 
     /// Check if ADB is accessible and working
+    #[allow(dead_code)]
     pub fn check_availability(&self) -> Result<bool, String> {
         match self.version() {
             Ok(_) => Ok(true),

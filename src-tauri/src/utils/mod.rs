@@ -34,6 +34,7 @@ pub fn get_scrcpy_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
 }
 
 /// Get the path to the scrcpy-server file
+#[allow(dead_code)]
 pub fn get_scrcpy_server_path(app: &tauri::AppHandle) -> Result<PathBuf, String> {
     let resource_path = app
         .path()
