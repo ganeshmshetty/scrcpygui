@@ -61,10 +61,6 @@ For detailed instructions, please refer to the [User Guide](docs/USER_GUIDE.md).
 - **Backend**: Rust, Tauri
 - **Core**: Scrcpy, ADB
 
-## License
-
-MIT License - See LICENSE file for details
-
 ## Acknowledgments
 
 - Powered by [scrcpy](https://github.com/Genymobile/scrcpy) by Genymobile
