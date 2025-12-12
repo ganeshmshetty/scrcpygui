@@ -2,17 +2,14 @@
 
 A modern, intuitive graphical interface for [scrcpy](https://github.com/Genymobile/scrcpy) - the powerful Android screen mirroring tool.
 
-![App Screenshot](docs/screenshots/app-preview.png)
-*(Screenshot placeholder)*
-
 ## Features
 
-- 📱 **Device Management** - Automatic USB device detection and wireless connection support
-- 🖥️ **Mirror Control** - One-click screen mirroring with customizable settings
-- 📡 **Wireless Setup** - Simplified wizard to switch from USB to Wireless (TCP/IP) mode
-- ⚙️ **Advanced Settings** - Persistent configuration for resolution, bitrate, FPS, and display options
-- 🔄 **Session Management** - Track and control multiple active mirroring sessions
-- 🎨 **Modern UI** - Clean, responsive interface built with React and Tailwind CSS
+- **Device Management** - Automatic USB device detection and wireless connection support
+- **Mirror Control** - One-click screen mirroring with customizable settings
+- **Wireless Setup** - Simplified wizard to switch from USB to Wireless (TCP/IP) mode
+- **Advanced Settings** - Persistent configuration for resolution, bitrate, FPS, and display options
+- **Session Management** - Track and control multiple active mirroring sessions
+- **Modern UI** - Clean, responsive interface built with React and Tailwind CSS
 
 ## Requirements
 
