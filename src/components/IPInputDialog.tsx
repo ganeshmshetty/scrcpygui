@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { deviceService } from "../services";
+import type { Device } from "../types";
 
 interface IPInputDialogProps {
   onComplete: () => void;
@@ -51,16 +52,21 @@ export function IPInputDialog({ onComplete, onCancel }: IPInputDialogProps) {
       
       if (success) {
         // Save the device for future use
-        const device = {
-          id: `${ipAddress}:${port}`,
-          name: "Manual Device",
+        const device: Device = {
+          id: `${ipAddress}:${portNum}`,
+          name: `Device (${ipAddress})`,
           model: "Unknown",
-          connection_type: "Wireless" as const,
-          status: "Connected" as const,
+          connection_type: "Wireless",
+          status: "Connected",
           ip_address: ipAddress,
         };
         
-        await deviceService.saveDevice(device);
+        try {
+          await deviceService.saveDevice(device);
+        } catch (saveErr) {
+          console.error("Failed to save device:", saveErr);
+          // Don't fail the whole operation if save fails
+        }
         onComplete();
       } else {
         setError("Failed to connect to device");

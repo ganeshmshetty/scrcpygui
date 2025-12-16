@@ -55,9 +55,15 @@ export function WirelessSetupWizard({ devices, onComplete, onCancel }: WirelessS
           ...selectedDevice,
           id: `${deviceIP}:5555`,
           connection_type: "Wireless",
+          status: "Connected",
           ip_address: deviceIP,
         };
-        await deviceService.saveDevice(wirelessDevice);
+        try {
+          await deviceService.saveDevice(wirelessDevice);
+        } catch (saveErr) {
+          console.error("Failed to save device:", saveErr);
+          // Don't fail the whole operation if save fails
+        }
       }
       
       setCurrentStep("complete");

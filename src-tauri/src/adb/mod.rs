@@ -158,21 +158,43 @@ impl Adb {
     fn parse_ip_route(&self, output: &str) -> Result<String, String> {
         // Parse the IP address from the output
         // Looking for lines like: "192.168.1.0/24 dev wlan0 proto kernel scope link src 192.168.1.100"
+        // Some devices use different interface names: wlan0, wlan1, wifi0, etc.
+        
+        // First try to find WiFi interface
         for line in output.lines() {
-            if line.contains("wlan") {
-                if let Some(src_pos) = line.find("src ") {
-                    let ip_start = src_pos + 4;
-                    let ip_part = &line[ip_start..];
-                    if let Some(ip_end) = ip_part.find(' ') {
-                        return Ok(ip_part[..ip_end].trim().to_string());
-                    } else {
-                        return Ok(ip_part.trim().to_string());
-                    }
+            let line_lower = line.to_lowercase();
+            if line_lower.contains("wlan") || line_lower.contains("wifi") {
+                if let Some(ip) = self.extract_src_ip(line) {
+                    return Ok(ip);
+                }
+            }
+        }
+        
+        // Fallback: look for any "src" IP that's not localhost
+        for line in output.lines() {
+            if let Some(ip) = self.extract_src_ip(line) {
+                // Skip localhost and link-local addresses
+                if !ip.starts_with("127.") && !ip.starts_with("169.254.") {
+                    return Ok(ip);
                 }
             }
         }
 
-        Err("Could not determine device IP address".to_string())
+        Err("Could not determine device IP address. Make sure the device is connected to WiFi.".to_string())
+    }
+    
+    /// Extract the source IP from an ip route line
+    fn extract_src_ip(&self, line: &str) -> Option<String> {
+        if let Some(src_pos) = line.find("src ") {
+            let ip_start = src_pos + 4;
+            let ip_part = &line[ip_start..];
+            if let Some(ip_end) = ip_part.find(' ') {
+                return Some(ip_part[..ip_end].trim().to_string());
+            } else {
+                return Some(ip_part.trim().to_string());
+            }
+        }
+        None
     }
 
     /// Execute a shell command on a device
