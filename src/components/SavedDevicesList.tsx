@@ -1,5 +1,6 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { deviceService } from "../services";
+import { useConfirmDialog } from "./ConfirmDialog";
 import type { Device } from "../types";
 
 interface SavedDevicesListProps {
@@ -12,23 +13,49 @@ export function SavedDevicesList({ onDeviceConnected }: SavedDevicesListProps) {
   const [error, setError] = useState<string | null>(null);
   const [connectingDeviceId, setConnectingDeviceId] = useState<string | null>(null);
 
-  const loadSavedDevices = async () => {
+  // Abort controller for cancelling async operations on unmount
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const isMountedRef = useRef(true);
+
+  const { confirm } = useConfirmDialog();
+
+  const loadSavedDevices = useCallback(async () => {
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setLoading(true);
     setError(null);
     try {
       const devices = await deviceService.getSavedDevices();
-      setSavedDevices(devices);
+      if (isMountedRef.current) {
+        setSavedDevices(devices);
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to load saved devices");
-      console.error("Error loading saved devices:", err);
+      if (isMountedRef.current && !(err instanceof DOMException && err.name === 'AbortError')) {
+        setError(err instanceof Error ? err.message : "Failed to load saved devices");
+        console.error("Error loading saved devices:", err);
+      }
     } finally {
-      setLoading(false);
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
     }
-  };
+  }, []);
 
   useEffect(() => {
+    isMountedRef.current = true;
     loadSavedDevices();
-  }, []);
+
+    return () => {
+      isMountedRef.current = false;
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
+      }
+    };
+  }, [loadSavedDevices]);
 
   const handleConnect = async (device: Device) => {
     if (!device.ip_address) return;
@@ -39,24 +66,40 @@ export function SavedDevicesList({ onDeviceConnected }: SavedDevicesListProps) {
     try {
       const port = device.id.includes(":") ? parseInt(device.id.split(":")[1], 10) : 5555;
       await deviceService.connectWireless(device.ip_address, port);
-      onDeviceConnected();
+      if (isMountedRef.current) {
+        onDeviceConnected();
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to connect");
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : "Failed to connect");
+      }
     } finally {
-      setConnectingDeviceId(null);
+      if (isMountedRef.current) {
+        setConnectingDeviceId(null);
+      }
     }
   };
 
-  const handleRemove = async (deviceId: string) => {
-    if (!confirm("Are you sure you want to remove this device from saved devices?")) {
-      return;
-    }
+  const handleRemove = async (deviceId: string, deviceName: string) => {
+    const confirmed = await confirm({
+      title: "Remove Saved Device",
+      message: `Are you sure you want to remove "${deviceName}" from your saved devices? You can always add it back later.`,
+      confirmText: "Remove",
+      cancelText: "Cancel",
+      variant: "danger",
+    });
+
+    if (!confirmed) return;
 
     try {
       await deviceService.removeSavedDevice(deviceId);
-      await loadSavedDevices(); // Refresh list
+      if (isMountedRef.current) {
+        await loadSavedDevices(); // Refresh list
+      }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to remove device");
+      if (isMountedRef.current) {
+        setError(err instanceof Error ? err.message : "Failed to remove device");
+      }
     }
   };
 
@@ -167,7 +210,7 @@ export function SavedDevicesList({ onDeviceConnected }: SavedDevicesListProps) {
                     )}
                   </button>
                   <button
-                    onClick={() => handleRemove(device.id)}
+                    onClick={() => handleRemove(device.id, device.name)}
                     className="px-3 py-1.5 text-sm border border-red-300 text-red-600 rounded-md hover:bg-red-50 transition-colors"
                     title="Remove device"
                   >

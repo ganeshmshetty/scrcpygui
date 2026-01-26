@@ -53,9 +53,16 @@ export function SettingsPanel({ onSettingsChange }: SettingsPanelProps) {
     setSettings(prev => ({ ...prev, [key]: value }));
   };
 
-  const resetToDefaults = () => {
+  const resetToDefaults = async () => {
     setSettings(DEFAULT_SETTINGS);
-    showMessage('success', 'Reset to default settings');
+    try {
+      await settingsService.saveSettings(DEFAULT_SETTINGS);
+      onSettingsChange?.(DEFAULT_SETTINGS);
+      showMessage('success', 'Reset to default settings');
+    } catch (error) {
+      console.error('Failed to save default settings:', error);
+      showMessage('error', 'Reset locally but failed to save');
+    }
   };
 
   if (loading) {
@@ -84,11 +91,10 @@ export function SettingsPanel({ onSettingsChange }: SettingsPanelProps) {
       {/* Message Banner */}
       {message && (
         <div
-          className={`mb-6 p-4 rounded-lg border-l-4 animate-slide-down ${
-            message.type === 'success'
+          className={`mb-6 p-4 rounded-lg border-l-4 animate-slide-down ${message.type === 'success'
               ? 'bg-green-50 text-green-800 border-green-500'
               : 'bg-red-50 text-red-800 border-red-500'
-          }`}
+            }`}
         >
           <div className="flex items-center gap-2">
             {message.type === 'success' ? (

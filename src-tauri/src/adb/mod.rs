@@ -13,6 +13,7 @@ pub struct AdbDevice {
 }
 
 /// ADB wrapper for executing commands and parsing output
+#[derive(Clone)]
 pub struct Adb {
     adb_path: PathBuf,
 }
@@ -25,8 +26,16 @@ impl Adb {
 
     /// Execute an ADB command and return the output
     fn execute(&self, args: &[&str]) -> Result<String, String> {
-        let output = Command::new(&self.adb_path)
-            .args(args)
+        #[cfg(target_os = "windows")]
+        use std::os::windows::process::CommandExt;
+
+        let mut command = Command::new(&self.adb_path);
+        command.args(args);
+
+        #[cfg(target_os = "windows")]
+        command.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+        let output = command
             .output()
             .map_err(|e| format!("Failed to execute ADB command: {}", e))?;
 

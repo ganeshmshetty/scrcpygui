@@ -176,6 +176,12 @@ pub fn build_scrcpy_command(
         cmd.arg("--turn-screen-off");
     }
     
+    #[cfg(target_os = "windows")]
+    {
+        use std::os::windows::process::CommandExt;
+        cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+    }
+    
     cmd
 }
 
@@ -198,8 +204,10 @@ pub fn execute_scrcpy(
     );
     
     // Spawn the process
-    cmd.stdout(Stdio::piped())
-        .stderr(Stdio::piped())
+    // Note: Using Stdio::null() because we don't consume stdout/stderr.
+    // Using piped() without reading would cause the buffer to fill and block the process.
+    cmd.stdout(Stdio::null())
+        .stderr(Stdio::null())
         .spawn()
         .map_err(|e| format!("Failed to start scrcpy: {}", e))
 }
@@ -214,11 +222,18 @@ pub fn kill_process(mut child: Child) -> Result<(), String> {
 pub fn get_version(app: &tauri::AppHandle) -> Result<String, String> {
     let scrcpy_path = utils::get_scrcpy_path(app)?;
     let scrcpy_dir = utils::get_scrcpy_dir(app)?;
+
+    #[cfg(target_os = "windows")]
+    use std::os::windows::process::CommandExt;
     
-    let output = Command::new(scrcpy_path)
-        .current_dir(scrcpy_dir)
-        .arg("--version")
-        .output()
+    let mut cmd = Command::new(scrcpy_path);
+    cmd.current_dir(scrcpy_dir)
+       .arg("--version");
+
+    #[cfg(target_os = "windows")]
+    cmd.creation_flags(0x08000000); // CREATE_NO_WINDOW
+
+    let output = cmd.output()
         .map_err(|e| format!("Failed to execute scrcpy: {}", e))?;
     
     if output.status.success() {

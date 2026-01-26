@@ -16,7 +16,7 @@ export function IPInputDialog({ onComplete, onCancel }: IPInputDialogProps) {
   const validateIP = (ip: string): boolean => {
     const ipRegex = /^(\d{1,3}\.){3}\d{1,3}$/;
     if (!ipRegex.test(ip)) return false;
-    
+
     const parts = ip.split(".");
     return parts.every(part => {
       const num = parseInt(part, 10);
@@ -49,7 +49,7 @@ export function IPInputDialog({ onComplete, onCancel }: IPInputDialogProps) {
 
     try {
       const success = await deviceService.connectWireless(ipAddress, portNum);
-      
+
       if (success) {
         // Save the device for future use
         const device: Device = {
@@ -60,7 +60,7 @@ export function IPInputDialog({ onComplete, onCancel }: IPInputDialogProps) {
           status: "Connected",
           ip_address: ipAddress,
         };
-        
+
         try {
           await deviceService.saveDevice(device);
         } catch (saveErr) {
@@ -78,7 +78,7 @@ export function IPInputDialog({ onComplete, onCancel }: IPInputDialogProps) {
     }
   };
 
-  const handleKeyPress = (e: React.KeyboardEvent) => {
+  const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === "Enter" && !loading) {
       handleConnect();
     }
@@ -88,7 +88,7 @@ export function IPInputDialog({ onComplete, onCancel }: IPInputDialogProps) {
     <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
       <div className="bg-white rounded-lg shadow-xl p-6 max-w-md w-full mx-4">
         <h2 className="text-2xl font-bold text-gray-900 mb-4">Connect to Device</h2>
-        
+
         <p className="text-gray-600 text-sm mb-4">
           Enter the IP address and port of your device. Make sure wireless debugging is enabled
           on your device and it's connected to the same network.
@@ -104,7 +104,7 @@ export function IPInputDialog({ onComplete, onCancel }: IPInputDialogProps) {
               type="text"
               value={ipAddress}
               onChange={(e) => setIPAddress(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
               placeholder="192.168.1.100"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={loading}
@@ -120,7 +120,7 @@ export function IPInputDialog({ onComplete, onCancel }: IPInputDialogProps) {
               type="text"
               value={port}
               onChange={(e) => setPort(e.target.value)}
-              onKeyPress={handleKeyPress}
+              onKeyDown={handleKeyDown}
               placeholder="5555"
               className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500"
               disabled={loading}

@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef, useCallback } from "react";
 import { scrcpyService } from "../services";
 import type { SessionStatus } from "../types";
 
@@ -13,10 +13,60 @@ export function MirrorStatus({ sessionId, deviceName, onCrashDetected }: MirrorS
   const [loading, setLoading] = useState(false);
   const [crashed, setCrashed] = useState(false);
 
+  // Use refs to track previous status and mounted state to avoid race conditions
+  const previousStatusRef = useRef<SessionStatus | null>(null);
+  const isMountedRef = useRef(true);
+  const abortControllerRef = useRef<AbortController | null>(null);
+
+  // Stable callback that uses refs for latest values
+  const checkStatus = useCallback(async () => {
+    if (!sessionId) return;
+
+    // Cancel any pending request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
+    try {
+      setLoading(true);
+      const currentStatus = await scrcpyService.getMirroringStatus(sessionId);
+
+      // Check if component is still mounted before updating state
+      if (!isMountedRef.current) return;
+
+      // Detect crash: if we expected it to be running but it's stopped
+      // Use ref to get the actual previous status, not stale closure value
+      if (previousStatusRef.current === "Running" && currentStatus === "Stopped" && !crashed) {
+        setCrashed(true);
+        console.warn(`Session ${sessionId} crashed or was terminated unexpectedly`);
+        onCrashDetected?.();
+      }
+
+      // Update refs and state
+      previousStatusRef.current = currentStatus;
+      setStatus(currentStatus);
+    } catch (err) {
+      // Only update state if mounted and not aborted
+      if (isMountedRef.current && !(err instanceof DOMException && err.name === 'AbortError')) {
+        console.error("Failed to get mirroring status:", err);
+        setStatus("Stopped" as SessionStatus);
+      }
+    } finally {
+      if (isMountedRef.current) {
+        setLoading(false);
+      }
+    }
+  }, [sessionId, crashed, onCrashDetected]);
+
   useEffect(() => {
+    // Reset mounted ref on mount
+    isMountedRef.current = true;
+
     if (!sessionId) {
       setStatus(null);
       setCrashed(false);
+      previousStatusRef.current = null;
       return;
     }
 
@@ -26,31 +76,17 @@ export function MirrorStatus({ sessionId, deviceName, onCrashDetected }: MirrorS
     // Poll status every 3 seconds
     const interval = setInterval(checkStatus, 3000);
 
-    return () => clearInterval(interval);
-  }, [sessionId]);
+    // Cleanup function
+    return () => {
+      isMountedRef.current = false;
+      clearInterval(interval);
 
-  const checkStatus = async () => {
-    if (!sessionId) return;
-
-    try {
-      setLoading(true);
-      const currentStatus = await scrcpyService.getMirroringStatus(sessionId);
-      
-      // Detect crash: if we expected it to be running but it's stopped
-      if (status === "Running" && currentStatus === "Stopped" && !crashed) {
-        setCrashed(true);
-        console.warn(`Session ${sessionId} crashed or was terminated unexpectedly`);
-        onCrashDetected?.();
+      // Abort any pending requests
+      if (abortControllerRef.current) {
+        abortControllerRef.current.abort();
       }
-      
-      setStatus(currentStatus);
-    } catch (err) {
-      console.error("Failed to get mirroring status:", err);
-      setStatus("Stopped" as SessionStatus);
-    } finally {
-      setLoading(false);
-    }
-  };
+    };
+  }, [sessionId, checkStatus]);
 
   if (!sessionId || !status) {
     return null;

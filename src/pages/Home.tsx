@@ -1,192 +1,321 @@
-import { useState, useEffect, useCallback } from "react";
-import { DeviceList } from "../components/DeviceList";
-import { WirelessSetupWizard } from "../components/WirelessSetupWizard";
-import { IPInputDialog } from "../components/IPInputDialog";
-import { SavedDevicesList } from "../components/SavedDevicesList";
-import { SettingsPanel } from "../components/SettingsPanel";
-import { Tooltip } from "../components/Tooltip";
+import { useState, useEffect, useCallback, useRef } from "react";
+import { RefreshCw } from "lucide-react";
+import { DeviceTable } from "../components/DeviceTable";
+import { DeviceDetailsPanel } from "../components/DeviceDetailsPanel";
+// import { IPInputDialog } from "../components/IPInputDialog";
 import { useToast } from "../components/ToastProvider";
-import { deviceService, scrcpyService } from "../services";
-import type { Device, MirrorSession } from "../types";
-import { MainLayout } from "../components/MainLayout";
-import { Tabs, Tab } from "../components/ui/Tabs";
+import { deviceService, scrcpyService, settingsService } from "../services";
+import type { Device, MirrorSession, ScrcpyOptions, Settings } from "../types";
+
+const DEVICE_POLL_INTERVAL = 3000;
+const SAVE_DEBOUNCE_MS = 500;
 
 export function Home() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [sessions, setSessions] = useState<MirrorSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  const [showWizard, setShowWizard] = useState(false);
-  const [showIPDialog, setShowIPDialog] = useState(false);
-  const [showSettings, setShowSettings] = useState(false);
+  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+  // const [showIPDialog, setShowIPDialog] = useState(false);
+
+  const isMountedRef = useRef(true);
+  const saveQueueRef = useRef<Map<string, Device>>(new Map());
+  const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toast = useToast();
 
+  // Get selected device
+  const selectedDevice = devices.find((d) => d.id === selectedDeviceId) || null;
+  const selectedSession = sessions.find((s) => s.device_id === selectedDeviceId) || null;
+
+  // Debounced device save to prevent race conditions
+  const queueDeviceSave = useCallback((device: Device) => {
+    saveQueueRef.current.set(device.id, device);
+
+    if (saveTimeoutRef.current) {
+      clearTimeout(saveTimeoutRef.current);
+    }
+
+    saveTimeoutRef.current = setTimeout(async () => {
+      const devicesToSave = Array.from(saveQueueRef.current.values());
+      saveQueueRef.current.clear();
+
+      for (const dev of devicesToSave) {
+        try {
+          await deviceService.saveDevice(dev);
+        } catch (err) {
+          console.error("Failed to save device:", err);
+        }
+      }
+    }, SAVE_DEBOUNCE_MS);
+  }, []);
+
+  // Load data
   const loadData = useCallback(async () => {
-    setIsLoading(true);
-    setError(null);
     try {
-      const [deviceList, sessionList] = await Promise.all([
+      // Fetch both connected and saved devices
+      const [connectedDevices, savedDevices, sessionList] = await Promise.all([
         deviceService.getConnectedDevices(),
+        deviceService.getSavedDevices(),
         scrcpyService.getActiveSessions(),
       ]);
-      setDevices(deviceList);
-      setSessions(sessionList);
-      if (deviceList.length === 0) {
-        toast.info("No devices connected. Try connecting via USB or use the wireless setup wizard.");
+
+      if (isMountedRef.current) {
+        // Create a map of merged devices
+        const mergedDevicesMap = new Map<string, Device>();
+
+        // 1. Add all saved devices first (default to Offline)
+        savedDevices.forEach((device) => {
+          mergedDevicesMap.set(device.id, { ...device, status: "Offline" });
+        });
+
+        // 2. Update/Add connected devices
+        for (const device of connectedDevices) {
+          const existing = mergedDevicesMap.get(device.id);
+
+          if (!existing) {
+            // New device we haven't seen before
+            mergedDevicesMap.set(device.id, device);
+            queueDeviceSave(device);
+          } else {
+            // Existing device: Update connection info but Preserve saved name
+            const mergedDevice = {
+              ...device,
+              name: existing.name, // Keep the custom name
+            };
+
+            mergedDevicesMap.set(device.id, mergedDevice);
+
+            // Only save if critical hardware info changed (unlikely for same ID)
+            if (existing.model !== device.model) {
+              queueDeviceSave(mergedDevice);
+            }
+          }
+        }
+
+        const finalList = Array.from(mergedDevicesMap.values());
+        setDevices(finalList);
+        setSessions(sessionList);
+
+        // Auto-select first device if none selected (use functional update to avoid dependency)
+        setSelectedDeviceId((prevSelected) => {
+          if (!prevSelected && finalList.length > 0) {
+            return finalList[0].id;
+          }
+          return prevSelected;
+        });
       }
     } catch (err) {
-      const errorMessage = err instanceof Error ? err.message : "Failed to load device data";
-      setError(errorMessage);
-      toast.error(errorMessage);
-      console.error(errorMessage, err);
+      console.error("Failed to load devices:", err);
     } finally {
-      setIsLoading(false);
-    }
-  }, [toast]);
-
-  useEffect(() => {
-    loadData();
-    const interval = setInterval(async () => {
-      try {
-        const sessionList = await scrcpyService.getActiveSessions();
-        setSessions(sessionList);
-      } catch (err) {
-        console.error("Failed to poll for sessions", err);
+      if (isMountedRef.current) {
+        setIsLoading(false);
       }
-    }, 2000); // Poll every 2 seconds
-    return () => clearInterval(interval);
+    }
+  }, [queueDeviceSave]);
+
+  // Refresh handler
+  const handleRefresh = useCallback(async () => {
+    setIsLoading(true);
+    await loadData();
+    toast.success("Devices refreshed");
+  }, [loadData, toast]);
+
+  // Polling
+  useEffect(() => {
+    isMountedRef.current = true;
+    loadData();
+
+    const interval = setInterval(() => {
+      if (isMountedRef.current) {
+        loadData();
+      }
+    }, DEVICE_POLL_INTERVAL);
+
+    return () => {
+      isMountedRef.current = false;
+      clearInterval(interval);
+      // Flush any pending saves on unmount
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+      }
+    };
   }, [loadData]);
 
-
-  const handleWizardComplete = () => {
-    setShowWizard(false);
-    toast.success("Wireless setup completed!");
-    loadData();
-  };
-
-  const handleIPDialogComplete = () => {
-    setShowIPDialog(false);
-    toast.success("Device connected successfully!");
-    loadData();
-  };
-
-  const handleConnect = async (device: Device) => {
-    if (!device.ip_address) return;
+  // Start mirroring
+  const handleStartMirroring = async (device: Device) => {
     try {
-      await deviceService.connectWireless(device.ip_address);
-      toast.success(`Connecting to ${device.name}...`);
+      const settings: Settings = await settingsService.loadSettings();
+      const options: Partial<ScrcpyOptions> = {
+        max_size: settings.resolution === "default" ? undefined : parseInt(settings.resolution),
+        bit_rate: settings.bitrate,
+        max_fps: settings.maxFps,
+        always_on_top: settings.alwaysOnTop,
+        stay_awake: settings.stayAwake,
+        turn_screen_off: settings.turnScreenOff,
+      };
+      await scrcpyService.startMirroring(device.id, options);
+      toast.success(`Started mirroring ${device.name}`);
       loadData();
     } catch (err) {
-      toast.error(`Failed to connect to ${device.name}`);
+      toast.error(`Failed to start mirroring: ${err}`);
     }
   };
 
-  const handleDisconnect = async (device: Device) => {
+  // Stop mirroring
+  const handleStopMirroring = async (sessionId: string) => {
     try {
-      await deviceService.disconnect(device.id);
-      toast.info(`Disconnected from ${device.name}`);
+      await scrcpyService.stopMirroring(sessionId);
+      toast.info("Mirroring stopped");
       loadData();
     } catch (err) {
-      toast.error(`Failed to disconnect from ${device.name}`);
+      toast.error(`Failed to stop mirroring: ${err}`);
     }
   };
 
-  const handleEnableWireless = async (device: Device) => {
+  // Remove saved device
+  const handleRemoveDevice = async (deviceId: string) => {
     try {
-      const ip = await deviceService.enableWirelessMode(device.id);
-      toast.success(`Wireless mode enabled for ${device.name} at ${ip}`);
+      await deviceService.removeSavedDevice(deviceId);
+      toast.success("Device removed from history");
+      if (selectedDeviceId === deviceId) {
+        setSelectedDeviceId(null);
+      }
       loadData();
     } catch (err) {
-      toast.error("Failed to enable wireless mode.");
+      toast.error("Failed to remove device");
     }
   };
 
-  const HeaderContent = (
-    <div className="flex justify-between items-center">
-      <div className="flex items-center gap-3">
-        <svg className="w-8 h-8 text-primary-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 18h.01M8 21h8a2 2 0 002-2V5a2 2 0 00-2-2H8a2 2 0 00-2 2v14a2 2 0 002 2z" />
-        </svg>
-        <h1 className="text-xl font-bold text-gray-800">Scrcpy GUI</h1>
-      </div>
-      <div className="flex items-center gap-2">
-        <Tooltip content="Set up wireless connection">
-          <button onClick={() => setShowWizard(true)} className="btn-secondary">
-            Wireless Setup
-          </button>
-        </Tooltip>
-        <Tooltip content="Connect to device using IP">
-          <button onClick={() => setShowIPDialog(true)} className="btn-secondary">
-            Connect by IP
-          </button>
-        </Tooltip>
-        <Tooltip content="Refresh device list">
-            <button onClick={loadData} disabled={isLoading} className="btn-ghost disabled:opacity-50">
-              <svg className={`w-5 h-5 ${isLoading ? 'animate-spin' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
-              </svg>
-            </button>
-          </Tooltip>
-        <Tooltip content="Settings">
-          <button onClick={() => setShowSettings(!showSettings)} className="btn-ghost">
-            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" />
-            </svg>
-          </button>
-        </Tooltip>
-      </div>
-    </div>
-  );
+  // Connect to offline wireless device
+  // const handleConnectDevice = async (device: Device) => {
+  //   if (!device.id.includes(':')) return;
+  //
+  //   const parts = device.id.split(':');
+  //   const ip = parts[0];
+  //   const port = parseInt(parts[1]) || 5555;
+  //
+  //   try {
+  //     await deviceService.connectWireless(ip, port);
+  //     toast.success(`Connected to ${device.name}`);
+  //     loadData();
+  //   } catch (err: any) {
+  //     const msg = err.message || String(err);
+  //     toast.error(`Failed to connect: ${msg}`);
+  //   }
+  // };
+
+  // Enable wireless
+  // const handleEnableWireless = async () => {
+  //   if (!selectedDevice) return;
+  //   try {
+  //     const ip = await deviceService.enableWirelessMode(selectedDevice.id);
+  //     toast.success(`Wireless enabled at ${ip}`);
+  //     // Force a reload to pick up the new wireless device and autosave it
+  //     loadData();
+  //   } catch (err) {
+  //     const errorMsg = err instanceof Error ? err.message : String(err);
+  //     console.error("Enable wireless error:", err);
+  //     toast.error(`Failed to enable wireless mode: ${errorMsg}`);
+  //   }
+  // };
+
+  // View logs
+  const handleViewLogs = () => {
+    toast.info("Logs feature coming soon!");
+  };
+
+  // IP connect complete
+  // const handleIPConnectComplete = () => {
+  //   setShowIPDialog(false);
+  //   toast.success("Device connected!");
+  //   loadData();
+  // };
 
   return (
     <>
-      <MainLayout header={HeaderContent}>
-        {showSettings && (
-          <div className="mb-4">
-            <SettingsPanel />
+      {/* Main Content Area */}
+      <div className="flex-1 flex flex-col">
+        {/* Toolbar */}
+        <header className="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-2">
+          <button
+            onClick={handleRefresh}
+            disabled={isLoading}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
+          >
+            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+            Refresh
+          </button>
+          <div className="w-px h-6 bg-gray-200" />
+          {/* <button
+            onClick={() => setShowIPDialog(true)}
+            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+          >
+            <Link2 size={16} />
+            IP Connect
+          </button> */}
+        </header>
+
+        {/* Devices Section */}
+        <div className="flex-1 p-4 overflow-hidden">
+          <div className="h-full bg-white rounded-lg border border-gray-200 flex flex-col">
+            <div className="px-4 py-3 border-b border-gray-100">
+              <h2 className="font-semibold text-gray-800">Devices</h2>
+            </div>
+            <DeviceTable
+              devices={devices}
+              sessions={sessions}
+              isLoading={isLoading}
+              selectedDeviceId={selectedDeviceId}
+              onSelectDevice={setSelectedDeviceId}
+              onStartMirroring={handleStartMirroring}
+              onStopMirroring={handleStopMirroring}
+              onRemoveDevice={handleRemoveDevice}
+              onRenameDevice={(deviceId, newName) => {
+                const device = devices.find(d => d.id === deviceId);
+                if (device) {
+                  const updatedDevice = { ...device, name: newName };
+                  // Update local state immediately
+                  setDevices(prev => prev.map(d => d.id === deviceId ? updatedDevice : d));
+                  // Save to persistent storage
+                  deviceService.saveDevice(updatedDevice)
+                    .then(() => toast.success(`Renamed to ${newName}`))
+                    .catch(err => {
+                      console.error("Failed to rename:", err);
+                      toast.error("Failed to rename device");
+                      // Revert on failure? Maybe unnecessary for now
+                    });
+                }
+              }}
+            // onConnectDevice={handleConnectDevice}
+            />
           </div>
-        )}
-
-        <div className="bg-white rounded-lg shadow-md p-4">
-            <Tabs defaultTab="Connected Devices">
-                <Tab name="Connected Devices">
-                  <DeviceList
-                    devices={devices}
-                    sessions={sessions}
-                    isLoading={isLoading}
-                    error={error}
-                    onConnect={handleConnect}
-                    onDisconnect={handleDisconnect}
-                    onEnableWireless={handleEnableWireless}
-                    onSessionUpdate={loadData}
-                    onRefresh={loadData}
-                  />
-                </Tab>
-                <Tab name="Saved Devices">
-                    <SavedDevicesList onDeviceConnected={loadData} />
-                </Tab>
-            </Tabs>
         </div>
-      </MainLayout>
+      </div>
 
-      {showWizard && (
-        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4 animate-fade-in">
-          <WirelessSetupWizard
-            devices={devices}
-            onComplete={handleWizardComplete}
-            onCancel={() => setShowWizard(false)}
-          />
-        </div>
-      )}
+      {/* Device Details Panel */}
+      <DeviceDetailsPanel
+        device={selectedDevice}
+        session={selectedSession}
+        onMirror={() => {
+          if (selectedDevice) {
+            if (selectedSession) {
+              handleStopMirroring(selectedSession.session_id);
+            } else {
+              handleStartMirroring(selectedDevice);
+            }
+          }
+        }}
+        // onEnableWireless={handleEnableWireless}
+        onViewLogs={handleViewLogs}
+        onClose={() => setSelectedDeviceId(null)}
+      />
 
-      {showIPDialog && (
+      {/* IP Connect Dialog */}
+      {/* {showIPDialog && (
         <IPInputDialog
-          onComplete={handleIPDialogComplete}
+          onComplete={handleIPConnectComplete}
           onCancel={() => setShowIPDialog(false)}
         />
-      )}
+      )} */}
     </>
   );
 }
