@@ -1,7 +1,7 @@
 import { useState, useEffect, useCallback, useRef } from "react";
 import { RefreshCw } from "lucide-react";
 import { DeviceTable } from "../components/DeviceTable";
-import { DeviceDetailsPanel } from "../components/DeviceDetailsPanel";
+
 // import { IPInputDialog } from "../components/IPInputDialog";
 import { useToast } from "../components/ToastProvider";
 import { deviceService, scrcpyService, settingsService } from "../services";
@@ -14,7 +14,7 @@ export function Home() {
   const [devices, setDevices] = useState<Device[]>([]);
   const [sessions, setSessions] = useState<MirrorSession[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [selectedDeviceId, setSelectedDeviceId] = useState<string | null>(null);
+
   // const [showIPDialog, setShowIPDialog] = useState(false);
 
   const isMountedRef = useRef(true);
@@ -22,9 +22,7 @@ export function Home() {
   const saveTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const toast = useToast();
 
-  // Get selected device
-  const selectedDevice = devices.find((d) => d.id === selectedDeviceId) || null;
-  const selectedSession = sessions.find((s) => s.device_id === selectedDeviceId) || null;
+
 
   // Debounced device save to prevent race conditions
   const queueDeviceSave = useCallback((device: Device) => {
@@ -95,13 +93,7 @@ export function Home() {
         setDevices(finalList);
         setSessions(sessionList);
 
-        // Auto-select first device if none selected (use functional update to avoid dependency)
-        setSelectedDeviceId((prevSelected) => {
-          if (!prevSelected && finalList.length > 0) {
-            return finalList[0].id;
-          }
-          return prevSelected;
-        });
+
       }
     } catch (err) {
       console.error("Failed to load devices:", err);
@@ -176,9 +168,8 @@ export function Home() {
     try {
       await deviceService.removeSavedDevice(deviceId);
       toast.success("Device removed from history");
-      if (selectedDeviceId === deviceId) {
-        setSelectedDeviceId(null);
-      }
+      await deviceService.removeSavedDevice(deviceId);
+      toast.success("Device removed from history");
       loadData();
     } catch (err) {
       toast.error("Failed to remove device");
@@ -218,104 +209,53 @@ export function Home() {
   //   }
   // };
 
-  // View logs
-  const handleViewLogs = () => {
-    toast.info("Logs feature coming soon!");
-  };
-
-  // IP connect complete
-  // const handleIPConnectComplete = () => {
-  //   setShowIPDialog(false);
-  //   toast.success("Device connected!");
-  //   loadData();
-  // };
+  // View logs - REMOVED
 
   return (
-    <>
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col">
-        {/* Toolbar */}
-        <header className="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-2">
-          <button
-            onClick={handleRefresh}
-            disabled={isLoading}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
-          >
-            <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
-            Refresh
-          </button>
-          <div className="w-px h-6 bg-gray-200" />
-          {/* <button
-            onClick={() => setShowIPDialog(true)}
-            className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
-          >
-            <Link2 size={16} />
-            IP Connect
-          </button> */}
-        </header>
+    <div className="flex-1 flex flex-col">
+      {/* Toolbar */}
+      <header className="h-14 bg-white border-b border-gray-200 flex items-center px-4 gap-2">
+        <button
+          onClick={handleRefresh}
+          disabled={isLoading}
+          className="inline-flex items-center gap-2 px-3 py-1.5 text-sm text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors disabled:opacity-50"
+        >
+          <RefreshCw size={16} className={isLoading ? "animate-spin" : ""} />
+          Refresh
+        </button>
+        <div className="w-px h-6 bg-gray-200" />
+      </header>
 
-        {/* Devices Section */}
-        <div className="flex-1 p-4 overflow-hidden">
-          <div className="h-full bg-white rounded-lg border border-gray-200 flex flex-col">
-            <div className="px-4 py-3 border-b border-gray-100">
-              <h2 className="font-semibold text-gray-800">Devices</h2>
-            </div>
-            <DeviceTable
-              devices={devices}
-              sessions={sessions}
-              isLoading={isLoading}
-              selectedDeviceId={selectedDeviceId}
-              onSelectDevice={setSelectedDeviceId}
-              onStartMirroring={handleStartMirroring}
-              onStopMirroring={handleStopMirroring}
-              onRemoveDevice={handleRemoveDevice}
-              onRenameDevice={(deviceId, newName) => {
-                const device = devices.find(d => d.id === deviceId);
-                if (device) {
-                  const updatedDevice = { ...device, name: newName };
-                  // Update local state immediately
-                  setDevices(prev => prev.map(d => d.id === deviceId ? updatedDevice : d));
-                  // Save to persistent storage
-                  deviceService.saveDevice(updatedDevice)
-                    .then(() => toast.success(`Renamed to ${newName}`))
-                    .catch(err => {
-                      console.error("Failed to rename:", err);
-                      toast.error("Failed to rename device");
-                      // Revert on failure? Maybe unnecessary for now
-                    });
-                }
-              }}
-            // onConnectDevice={handleConnectDevice}
-            />
-          </div>
+      {/* Devices Section */}
+      <div className="flex-1 p-6 overflow-hidden">
+        <div className="mb-4 px-2">
+          <h2 className="text-lg font-semibold text-gray-800">My Devices</h2>
         </div>
-      </div>
-
-      {/* Device Details Panel */}
-      <DeviceDetailsPanel
-        device={selectedDevice}
-        session={selectedSession}
-        onMirror={() => {
-          if (selectedDevice) {
-            if (selectedSession) {
-              handleStopMirroring(selectedSession.session_id);
-            } else {
-              handleStartMirroring(selectedDevice);
+        <DeviceTable
+          devices={devices}
+          sessions={sessions}
+          isLoading={isLoading}
+          onStartMirroring={handleStartMirroring}
+          onStopMirroring={handleStopMirroring}
+          onRemoveDevice={handleRemoveDevice}
+          onRenameDevice={(deviceId, newName) => {
+            const device = devices.find(d => d.id === deviceId);
+            if (device) {
+              const updatedDevice = { ...device, name: newName };
+              // Update local state immediately
+              setDevices(prev => prev.map(d => d.id === deviceId ? updatedDevice : d));
+              // Save to persistent storage
+              deviceService.saveDevice(updatedDevice)
+                .then(() => toast.success(`Renamed to ${newName}`))
+                .catch(err => {
+                  console.error("Failed to rename:", err);
+                  toast.error("Failed to rename device");
+                  // Revert on failure? Maybe unnecessary for now
+                });
             }
-          }
-        }}
-        // onEnableWireless={handleEnableWireless}
-        onViewLogs={handleViewLogs}
-        onClose={() => setSelectedDeviceId(null)}
-      />
-
-      {/* IP Connect Dialog */}
-      {/* {showIPDialog && (
-        <IPInputDialog
-          onComplete={handleIPConnectComplete}
-          onCancel={() => setShowIPDialog(false)}
+          }}
         />
-      )} */}
-    </>
+      </div>
+    </div>
   );
 }

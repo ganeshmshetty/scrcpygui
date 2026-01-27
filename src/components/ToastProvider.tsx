@@ -45,10 +45,10 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={memoizedValue}>
       {children}
-      
+
       {/* Toast Container */}
-      <div className="fixed top-4 right-4 z-50 flex flex-col gap-2 max-w-md">
-        {toasts.map((toast) => (
+      <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-md">
+        {toasts.slice(-3).map((toast) => (
           <Toast
             key={toast.id}
             message={toast.message}

@@ -65,11 +65,9 @@ pub async fn stop_mirroring(
     state: State<'_, ScrcpyState>,
     session_id: String,
 ) -> Result<bool, String> {
-    // We need to own the ProcessInfo to kill it, so we must remove it from the map first.
-    let process_info = {
-        let mut processes = state.processes.lock().map_err(|e| format!("Failed to lock processes mutex: {}", e))?;
-        processes.remove(&session_id)
-    };
+    // Implement via helper to avoid strict lock scope issues in main command files
+    // and to use the shared remove_process logic.
+    let process_info = state.remove_process(&session_id)?;
 
     if let Some(mut info) = process_info {
         println!("Stopping mirroring session: {}", session_id);
@@ -89,9 +87,8 @@ pub async fn stop_mirroring(
                     // The process might still be running. We must put the info back to avoid orphaning it.
                     eprintln!("Failed to kill process for session {}, re-inserting into map. Error: {}", session_id, e);
                     
-                    // Re-acquire lock to put it back
-                    let mut processes = state.processes.lock().map_err(|e_lock| format!("Failed to re-lock processes mutex: {}", e_lock))?;
-                    processes.insert(session_id.clone(), info);
+                    // Put it back using the public API
+                    state.add_process(session_id.clone(), info)?;
                     
                     Err(format!("Failed to stop session {}: {}", session_id, e))
                 }

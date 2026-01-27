@@ -204,19 +204,15 @@ pub fn execute_scrcpy(
     );
     
     // Spawn the process
-    // Note: Using Stdio::null() because we don't consume stdout/stderr.
-    // Using piped() without reading would cause the buffer to fill and block the process.
-    cmd.stdout(Stdio::null())
-        .stderr(Stdio::null())
+    // Note: We use inherit() to pipe scrcpy output directly to our terminal for debugging.
+    // This allows us to see errors like "Input injection failed" or specific device warnings.
+    cmd.stdout(Stdio::inherit())
+        .stderr(Stdio::inherit())
         .spawn()
         .map_err(|e| format!("Failed to start scrcpy: {}", e))
 }
 
-/// Kill a scrcpy process
-pub fn kill_process(mut child: Child) -> Result<(), String> {
-    child.kill()
-        .map_err(|e| format!("Failed to kill process: {}", e))
-}
+
 
 /// Get scrcpy version
 pub fn get_version(app: &tauri::AppHandle) -> Result<String, String> {

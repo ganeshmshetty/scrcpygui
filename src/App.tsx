@@ -5,24 +5,29 @@ import { Home } from "./pages/Home";
 import { SettingsPage } from "./pages/SettingsPage";
 import { ToastProvider } from "./components/ToastProvider";
 import { ConfirmDialogProvider } from "./components/ConfirmDialog";
+import { InputDialogProvider } from "./components/InputDialog";
 
 function App() {
   const [activeTab, setActiveTab] = useState("home");
 
   return (
     <ConfirmDialogProvider>
-      <ToastProvider>
-        <div className="h-screen flex bg-gray-50">
-          {/* Sidebar */}
-          <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
+      <InputDialogProvider>
+        <ToastProvider>
+          <div className="h-screen flex bg-gray-50">
+            {/* Sidebar */}
+            <Sidebar activeTab={activeTab} onTabChange={setActiveTab} />
 
-          {/* Main Content */}
-          <div className="flex-1 flex">
-            {activeTab === "home" && <Home />}
-            {activeTab === "settings" && <SettingsPage />}
+            {/* Main Content */}
+            <main className="flex-1 flex overflow-hidden">
+              <div key={activeTab} className="flex-1 flex w-full h-full animate-simple-fade">
+                {activeTab === "home" && <Home />}
+                {activeTab === "settings" && <SettingsPage />}
+              </div>
+            </main>
           </div>
-        </div>
-      </ToastProvider>
+        </ToastProvider>
+      </InputDialogProvider>
     </ConfirmDialogProvider>
   );
 }
